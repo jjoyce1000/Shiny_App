@@ -1,0 +1,92 @@
+---
+title: "Gymnastics Scoring"
+author: "John Joyce"
+date: "February 15, 2018"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+## Summary
+The Gymnastics Scoring App extracts USAG Gymnastics Meet Information from the Meetscoresonline.com website for men and women gymnasts.
+  
+## Application Usage  
+This basic application extracts USAG Gymnastics Meet Information from the Meetscoresonline.com website for men and women gymnasts.
+It allows the user to input the "state" for the gymnastics meet that filters the results in the output report.
+The output also provides plots showing the distribution of men's and women's meets by state.
+
+```{r echo=FALSE, eval= TRUE, message=FALSE,warning=FALSE}
+##  This application loads several packages to manipulate and output the data as needed.
+
+    if (!require("shiny")) install.packages("shiny")
+    if (!require("shinydashboard")) install.packages("shinydashboard")
+    if (!require("leaflet")) install.packages("leaflet")
+    if (!require("rvest")) install.packages("rvest")
+    if (!require("dplyr")) install.packages("dplyr")
+    if (!require("ggplot2")) install.packages("ggplot2")
+    if (!require("XML")) install.packages("XML")
+    if (!require("stringr")) install.packages("stringr")
+    if (!require("tidyr")) install.packages("tidyr")
+   
+    library(shiny)
+    library(shinydashboard)
+    library(leaflet)
+    library(rvest)
+    library(dplyr)
+    library(ggplot2)
+    library(XML)
+    library(stringr)
+    library(tidyr)
+```
+## Data Analysis
+This application reads a website (www.meetscoresonline.com) and parses the html code.
+The data analysis includes reading and parsing the data and creates a data frame that contains meet information.
+```{r echo=FALSE, eval = TRUE, message=FALSE,warning=FALSE}    
+    ##  Load and store the url of the meetscoresonline.com website
+
+    my_url <- "http://www.meetscoresonline.com/Results"
+
+##  Parse the html code and use xml xpath functions to extract the desired fields.   
+
+    webpage <- htmlParse(my_url)
+    webroot <- xmlRoot(webpage)
+    
+    meet_list <- xpathSApply(webroot, "//table/..//tr", xmlGetAttr,"data-filter-by")
+    meet_df <- do.call(rbind, meet_list) %>% as.data.frame()
+    meet_df <- data.frame(lapply(meet_df, trimws), stringsAsFactors = FALSE)
+    names(meet_df) <- c("meet")
+
+##  Create new dataframe that extracts the gender and state for the meet name
+    
+    meet_df <- mutate(meet_df, 
+                    gender = substr(meet,str_length(meet)-2,str_length(meet)),
+                    state=substr(meet,str_length(meet)-6,str_length(meet)-5))
+    
+##  Extract the states for the gymnastics meets which will be used as input to the drop down list 
+##  for the user to select.
+    
+    meet_states <- unique(meet_df$state) %>%
+                      sort(meet_df$state, decreasing = FALSE) 
+    
+##  Parse the html code to find the website links containing the scores for each individual meet.  
+
+    test_list <- as.list(xpathSApply(webroot, "//table/..//a",xmlGetAttr,"href"))
+    test_df <- do.call(rbind, test_list) %>% as.data.frame()
+    lst <- lapply(test_df, grep, pattern="/R", value=TRUE)
+    combined_df <- cbind(meet_df, lst)
+    combined_df <- mutate(combined_df,
+                          site=paste("www.meetscoresonline.com",V1,sep=""))
+    
+```
+A sample of the resulting extracted data frame is shown below:
+
+```{r echo=FALSE, eval = TRUE, message=FALSE,warning=FALSE}    
+    head(combined_df)    
+
+```
+##  Running the Application
+The application can be used at the following location:
+https://jjoyce1000.shinyapps.io/Gymnastics_Scoring/
